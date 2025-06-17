@@ -25,14 +25,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <time.h>
 #include "IridiumSBD.h"
 
-
+// Callback function declarations
 bool ISBDCallback() __attribute__((weak));
 void ISBDConsoleCallback(IridiumSBD *device, char c) __attribute__((weak));
 void ISBDDiagsCallback(IridiumSBD *device, char c) __attribute__((weak));
+void SBDIXStartCallback(IridiumSBD *device) __attribute__((weak));
+void MoCodeCallback(IridiumSBD *device, uint16_t moCode) __attribute__((weak));
+void ATTimeoutCallback(IridiumSBD *device) __attribute__((weak));
 
+// Default callback implementations
 bool ISBDCallback() { return true; }
 void ISBDConsoleCallback(IridiumSBD *device, char c) { }
 void ISBDDiagsCallback(IridiumSBD *device, char c) { }
+void SBDIXStartCallback(IridiumSBD *device) { }
+void MoCodeCallback(IridiumSBD *device, uint16_t moCode) { }
+void ATTimeoutCallback(IridiumSBD *device) { }
 
 // Power on the RockBLOCK or return from sleep
 int IridiumSBD::begin()
@@ -614,6 +621,9 @@ bool IridiumSBD::waitForATResponse(char *response, int responseSize, const char 
          }
       } // while (stream.available() > 0)
    } // timer loop
+
+   // Call timeout callback when we exit the loop due to timeout
+   ATTimeoutCallback(this);
    return false;
 }
 
@@ -629,6 +639,10 @@ int IridiumSBD::doSBDIX(uint16_t &moCode, uint16_t &moMSN, uint16_t &mtCode, uin
 {
    // Returns xx,xxxxx,xx,xxxxx,xx,xxx
    char sbdixResponseBuf[32];
+
+   // Call the SBDIX start callback
+   SBDIXStartCallback(this);
+
    send(F("AT+SBDIX\r"));
    if (!waitForATResponse(sbdixResponseBuf, sizeof(sbdixResponseBuf), "+SBDIX: "))
       return cancelled() ? ISBD_CANCELLED : ISBD_PROTOCOL_ERROR;
@@ -641,6 +655,10 @@ int IridiumSBD::doSBDIX(uint16_t &moCode, uint16_t &moMSN, uint16_t &mtCode, uin
          return ISBD_PROTOCOL_ERROR;
       *values[i] = atol(p);
    }
+
+   // Call the moCode callback
+   MoCodeCallback(this, moCode);
+
    return ISBD_SUCCESS;
 }
 
